@@ -4,18 +4,23 @@
   "author": "",
   "license": "MIT",
   "scripts": {
+    "build": "circom -l ./node_modules circuits/proof_of_passport.circom --r1cs --wasm",
     "test": "yarn ts-mocha test/**/*.test.ts --exit"
   },
   "dependencies": {
     "@types/chai-as-promised": "^7.1.6",
     "@types/node": "^20.6.3",
     "@types/node-forge": "^1.3.5",
+    "@zk-kit/circuits": "1.0.0-beta",
+    "@zk-kit/incremental-merkle-tree": "^1.1.0",
     "chai-as-promised": "^7.1.1",
+    "circom_runtime": "^0.1.24",
     "circomlib": "^2.0.5",
     "js-sha256": "^0.10.1",
     "node-forge": "^1.3.1",
     "snarkjs": "^0.7.1",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "wasm-vole-zk-adapter": "0.1.6"
   },
   "devDependencies": {
     "@types/chai": "^4.3.6",
