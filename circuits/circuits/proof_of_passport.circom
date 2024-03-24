@@ -60,6 +60,6 @@ template ProofOfPassport(n, k, MAX_DEPTH) {
     
 }
 
-component main = ProofOfPassport(64, 32, 8);
+component main = ProofOfPassport(64, 32, 15);
 
 

@@ -8,13 +8,24 @@ import { getPassportData } from '../../common/src/utils/passportData'
 import { attributeToPosition } from '../../common/src/constants/constants'
 import * as fs from 'fs';
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { prove, verify } from 'wasm-vole-zk-adapter'
+import { prove } from 'wasm-vole-zk-adapter'
+
+import dotenv from "dotenv"
+import { ISSUER_TREE_DEPTH, generateModulusHashes, loadIsssuerTree, hashPubkey } from '../scripts/issuerPubkeyUtils'
+dotenv.config()
+
+// coneverts buffer to string of 0s and 1s
+// main line from https://stackoverflow.com/a/66415563
+function buf2bin (buffer) {
+  let binString = BigInt('0x' + buffer.toString('hex')).toString(2).padStart(buffer.length * 8, '0')
+  return Array.from(binString)
+}
 
 chai.use(chaiAsPromised)
 
 async function makeProof(inputs) {
-  const r1cs = fs.readFileSync(`./build/proof_of_passport.r1cs`);
-  const wasm = fs.readFileSync(`./build/proof_of_passport_js/proof_of_passport.wasm`);
+  const r1cs = fs.readFileSync(`./proof_of_passport.r1cs`);
+  const wasm = fs.readFileSync(`./proof_of_passport_js/proof_of_passport.wasm`);
   const wc = await WitnessCalculatorBuilder(wasm);
   let t = Date.now();
   const witness =  (wc.circom_version() == 1) ? await wc.calculateBinWitness(inputs) : await wc.calculateWTNSBin(inputs);
@@ -22,11 +33,12 @@ async function makeProof(inputs) {
   t = Date.now();
   const cnp = prove(r1cs, witness);  
   console.log("Proof generation time:", Date.now() - t);
+  return cnp;
 }
-async function verifyProof(cnp) {
-  const r1cs = fs.readFileSync(`./build/proof_of_passport.r1cs`);
-  return verify(r1cs, cnp);
-}
+// async function verifyProof(cnp) {
+//   const r1cs = fs.readFileSync(`./build/proof_of_passport.r1cs`);
+//   return verify(r1cs, cnp);
+// }
 
 console.log("The following snarkjs error logs are normal and expected if the tests pass.")
 
@@ -36,43 +48,58 @@ describe('Circuit tests', function () {
   let inputs: any;
 
   this.beforeAll(async () => {
-    const passportData = getPassportData();
-    const formattedMrz = formatMrz(passportData.mrz);
-    console.log("passportData", 
-    formattedMrz,
-    passportData.dataGroupHashes as DataHash[]
-    )
-    const mrzHash = hash(formatMrz(passportData.mrz));
-    const concatenatedDataHashes = formatAndConcatenateDataHashes(
-      mrzHash,
-      passportData.dataGroupHashes as DataHash[],
-    );
+    // await generateModulusHashes();
+    // What the user would see after the # in the silk passport callback url
+    const [digest, sig, pubkey] = process.env.PASSPORT_DATA_FROM_CALLBACK_URL.replaceAll('%2B','+').replaceAll('%2F','/').replaceAll('%3D','=').split(',').map(x => Buffer.from(x, 'base64'));
+    const tree = await loadIsssuerTree();
+    const issuer = await hashPubkey('0x'+pubkey.toString('hex'));
+    console.log('issuer', issuer)
+    console.log('keys', Object.keys(tree))
+    const idx = tree.nodes[0].indexOf(BigInt(issuer));
+    console.log('idx', idx)
+    const proof = tree.createProof(idx);
+    console.log('proof', proof)
+    // const passportData = getPassportData();
+    // const formattedMrz = formatMrz(passportData.mrz);
+    // console.log("passportData", 
+    // formattedMrz,
+    // passportData.dataGroupHashes as DataHash[]
+    // )
+    // const mrzHash = hash(formatMrz(passportData.mrz));
+    // const concatenatedDataHashes = formatAndConcatenateDataHashes(
+    //   mrzHash,
+    //   passportData.dataGroupHashes as DataHash[],
+    // );
     
-    const concatenatedDataHashesHashDigest = hash(concatenatedDataHashes);
+    // const concatenatedDataHashesHashDigest = hash(concatenatedDataHashes);
 
-    assert(
-      arraysAreEqual(passportData.eContent.slice(72, 72 + 32), concatenatedDataHashesHashDigest),
-      'concatenatedDataHashesHashDigest is at the right place in passportData.eContent'
-    )
+    // assert(
+    //   arraysAreEqual(passportData.eContent.slice(72, 72 + 32), concatenatedDataHashesHashDigest),
+    //   'concatenatedDataHashesHashDigest is at the right place in passportData.eContent'
+    // )
 
-    const reveal_bitmap = Array(88).fill('1');
-
+    // const reveal_bitmap = Array(88).fill('1');
+    
     inputs = {
-      mrz: formattedMrz.map(byte => String(byte)),
-      reveal_bitmap: reveal_bitmap.map(byte => String(byte)),
-      dataHashes: concatenatedDataHashes.map(toUnsignedByte).map(byte => String(byte)),
-      eContentBytes: passportData.eContent.map(toUnsignedByte).map(byte => String(byte)),
+      // mrz: formattedMrz.map(byte => String(byte)),
+      // reveal_bitmap: reveal_bitmap.map(byte => String(byte)),
+      // dataHashes: concatenatedDataHashes.map(toUnsignedByte).map(byte => String(byte)),
+      // eContentBytes: passportData.eContent.map(toUnsignedByte).map(byte => String(byte)),
+      leaf: proof.leaf,
+      depth: ISSUER_TREE_DEPTH,
+      indices: proof.pathIndices,//.map(idx => idx.toString()),
+      siblings: proof.siblings,
       pubkey: splitToWords(
-        BigInt(passportData.pubKey.modulus),
+        BigInt('0x'+pubkey.toString('hex')),
         BigInt(64),
         BigInt(32)
       ),
       signature: splitToWords(
-        BigInt(bytesToBigDecimal(passportData.encryptedDigest)),
+        BigInt('0x'+sig.toString('hex')),
         BigInt(64),
         BigInt(32)
       ),
-      address: "0x70997970c51812dc3a010c7d01b50e0d17dc79c8", // sample address
+      eContentSha: buf2bin(digest)
     }
     
   })
@@ -81,7 +108,7 @@ describe('Circuit tests', function () {
   describe('Proof', function() {
     it('should prove and verify with valid inputs', async function () {
       console.log("inputs", inputs)
-
+      console.log('proof', await makeProof(inputs))
       await expect(makeProof(inputs)).to.not.be.rejected;
       })
 
