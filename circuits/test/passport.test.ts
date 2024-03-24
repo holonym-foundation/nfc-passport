@@ -23,6 +23,31 @@ function buf2bin (buffer) {
 
 chai.use(chaiAsPromised)
 
+// urlCallbackData is the url-encoded data after the # in the callback url
+async function makeProofInputs(urlCallbackData: string) {
+  const [digest, sig, pubkey] = urlCallbackData.replaceAll('%2B','+').replaceAll('%2F','/').replaceAll('%3D','=').split(',').map(x => Buffer.from(x, 'base64'));
+  const tree = await loadIsssuerTree();
+  const issuer = await hashPubkey('0x'+pubkey.toString('hex'));
+  const idx = tree.nodes[0].indexOf(BigInt(issuer));
+  const proof = tree.createProof(idx);
+  
+  return  {
+    depth: ISSUER_TREE_DEPTH,
+    indices: proof.pathIndices,//.map(idx => idx.toString()),
+    siblings: proof.siblings,
+    pubkey: splitToWords(
+      BigInt('0x'+pubkey.toString('hex')),
+      BigInt(64),
+      BigInt(32)
+    ),
+    signature: splitToWords(
+      BigInt('0x'+sig.toString('hex')),
+      BigInt(64),
+      BigInt(32)
+    ),
+    eContentSha: buf2bin(digest)
+  }
+}
 async function makeProof(inputs) {
   const r1cs = fs.readFileSync(`./proof_of_passport.r1cs`);
   const wasm = fs.readFileSync(`./proof_of_passport_js/proof_of_passport.wasm`);
@@ -35,10 +60,6 @@ async function makeProof(inputs) {
   console.log("Proof generation time:", Date.now() - t);
   return cnp;
 }
-// async function verifyProof(cnp) {
-//   const r1cs = fs.readFileSync(`./build/proof_of_passport.r1cs`);
-//   return verify(r1cs, cnp);
-// }
 
 console.log("The following snarkjs error logs are normal and expected if the tests pass.")
 
@@ -48,60 +69,7 @@ describe('Circuit tests', function () {
   let inputs: any;
 
   this.beforeAll(async () => {
-    // await generateModulusHashes();
-    // What the user would see after the # in the silk passport callback url
-    const [digest, sig, pubkey] = process.env.PASSPORT_DATA_FROM_CALLBACK_URL.replaceAll('%2B','+').replaceAll('%2F','/').replaceAll('%3D','=').split(',').map(x => Buffer.from(x, 'base64'));
-    const tree = await loadIsssuerTree();
-    const issuer = await hashPubkey('0x'+pubkey.toString('hex'));
-    console.log('issuer', issuer)
-    console.log('keys', Object.keys(tree))
-    const idx = tree.nodes[0].indexOf(BigInt(issuer));
-    console.log('idx', idx)
-    const proof = tree.createProof(idx);
-    // const passportData = getPassportData();
-    // const formattedMrz = formatMrz(passportData.mrz);
-    // console.log("passportData", 
-    // formattedMrz,
-    // passportData.dataGroupHashes as DataHash[]
-    // )
-    // const mrzHash = hash(formatMrz(passportData.mrz));
-    // const concatenatedDataHashes = formatAndConcatenateDataHashes(
-    //   mrzHash,
-    //   passportData.dataGroupHashes as DataHash[],
-    // );
-    
-    // const concatenatedDataHashesHashDigest = hash(concatenatedDataHashes);
-
-    // assert(
-    //   arraysAreEqual(passportData.eContent.slice(72, 72 + 32), concatenatedDataHashesHashDigest),
-    //   'concatenatedDataHashesHashDigest is at the right place in passportData.eContent'
-    // )
-
-    // const reveal_bitmap = Array(88).fill('1');
-    
-    inputs = {
-      // mrz: formattedMrz.map(byte => String(byte)),
-      // reveal_bitmap: reveal_bitmap.map(byte => String(byte)),
-      // dataHashes: concatenatedDataHashes.map(toUnsignedByte).map(byte => String(byte)),
-      // eContentBytes: passportData.eContent.map(toUnsignedByte).map(byte => String(byte)),
-      // leaf: proof.leaf,
-
-      depth: ISSUER_TREE_DEPTH,
-      indices: proof.pathIndices,//.map(idx => idx.toString()),
-      siblings: proof.siblings,
-      pubkey: splitToWords(
-        BigInt('0x'+pubkey.toString('hex')),
-        BigInt(64),
-        BigInt(32)
-      ),
-      signature: splitToWords(
-        BigInt('0x'+sig.toString('hex')),
-        BigInt(64),
-        BigInt(32)
-      ),
-      eContentSha: buf2bin(digest)
-    }
-    
+    inputs = await makeProofInputs(process.env.PASSPORT_DATA_FROM_CALLBACK_URL)    
   })
   
   describe('Proof', function() {
