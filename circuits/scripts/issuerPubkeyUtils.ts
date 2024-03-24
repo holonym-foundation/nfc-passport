@@ -2,9 +2,10 @@ import { buildPoseidon } from "circomlibjs"
 import issuers from "../NFC passport public key verifier government.json"
 import { IncrementalMerkleTree } from "@zk-kit/incremental-merkle-tree"
 import { existsSync, readFileSync, writeFileSync } from "fs";
+import { splitToWords } from "../../common/src/utils/utils";
 
 export const ISSUER_TREE_DEPTH = 15;
-
+export const ISSUER_MERKLE_ROOT = 7736555168982414935845416270175042690947241176010772269223189822481239297452n;
 let poseidon;
 let issuerTree;
 
@@ -103,15 +104,21 @@ export async function saveIssuerTree() {
 function packPubkey(pubkey: BigInt) {
   const sixtyFour = BigInt(64);
   // to 64-bit chunks
-  const parts = pubkey.toString(16).match(/.{1,8}/g);
+  const parts = splitToWords(
+    BigInt(pubkey.toString()),
+    BigInt(64),
+    BigInt(32)
+  ); //pubkey.toString(16).match(/.{1,8}/g);
+  // console.log('pubkey chunks', parts)
   let pubkeyPacked = [];
   for (var i = 0; i < 11; i++) {
     if (i < 10) {
-      pubkeyPacked.push(BigInt('0x'+parts.at(3*i)) * sixtyFour * sixtyFour + BigInt('0x'+parts.at(3*i + 1)) * sixtyFour + BigInt('0x'+parts.at(3*i + 2)));
+      pubkeyPacked.push(BigInt(parts.at(3*i)) * sixtyFour * sixtyFour + BigInt(parts.at(3*i + 1)) * sixtyFour + BigInt(parts.at(3*i + 2)));
     } else {
-      pubkeyPacked.push(BigInt('0x'+parts.at(3*i)) * sixtyFour * sixtyFour);
+      pubkeyPacked.push(BigInt(parts.at(3*i)) * sixtyFour * sixtyFour);
     }
   }
+  // console.log('pubkeyPacked', pubkeyPacked)
   return pubkeyPacked;
 }
   

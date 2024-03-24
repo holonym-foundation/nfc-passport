@@ -8,10 +8,10 @@ import { getPassportData } from '../../common/src/utils/passportData'
 import { attributeToPosition } from '../../common/src/constants/constants'
 import * as fs from 'fs';
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { prove } from 'wasm-vole-zk-adapter'
+import { prove, verify } from 'wasm-vole-zk-adapter-nodejs'
 
 import dotenv from "dotenv"
-import { ISSUER_TREE_DEPTH, generateModulusHashes, loadIsssuerTree, hashPubkey } from '../scripts/issuerPubkeyUtils'
+import { ISSUER_TREE_DEPTH, generateModulusHashes, loadIsssuerTree, hashPubkey, ISSUER_MERKLE_ROOT } from '../scripts/issuerPubkeyUtils'
 dotenv.config()
 
 // coneverts buffer to string of 0s and 1s
@@ -58,7 +58,6 @@ describe('Circuit tests', function () {
     const idx = tree.nodes[0].indexOf(BigInt(issuer));
     console.log('idx', idx)
     const proof = tree.createProof(idx);
-    console.log('proof', proof)
     // const passportData = getPassportData();
     // const formattedMrz = formatMrz(passportData.mrz);
     // console.log("passportData", 
@@ -85,7 +84,8 @@ describe('Circuit tests', function () {
       // reveal_bitmap: reveal_bitmap.map(byte => String(byte)),
       // dataHashes: concatenatedDataHashes.map(toUnsignedByte).map(byte => String(byte)),
       // eContentBytes: passportData.eContent.map(toUnsignedByte).map(byte => String(byte)),
-      leaf: proof.leaf,
+      // leaf: proof.leaf,
+
       depth: ISSUER_TREE_DEPTH,
       indices: proof.pathIndices,//.map(idx => idx.toString()),
       siblings: proof.siblings,
@@ -103,41 +103,62 @@ describe('Circuit tests', function () {
     }
     
   })
-  console.log("inputs", inputs)
   
   describe('Proof', function() {
     it('should prove and verify with valid inputs', async function () {
-      console.log("inputs", inputs)
-      console.log('proof', await makeProof(inputs))
+      const proof = await makeProof(inputs);
+      const r1cs = fs.readFileSync(`./proof_of_passport.r1cs`);
+      const result = JSON.parse(await verify(r1cs, proof));
+      console.log("result", result)
       await expect(makeProof(inputs)).to.not.be.rejected;
-      })
+      expect(
+        Buffer.from(result.public_outputs[1])
+      ).to.deep.equal(
+        Buffer.from(ISSUER_MERKLE_ROOT.toString(16), 'hex')
+      );
+    });
 
-    it('should fail to prove with invalid mrz', async function () {
-      const invalidInputs = {
-        ...inputs,
-        mrz: inputs.mrz.map((byte: string) => String((parseInt(byte, 10) + 1) % 256)),
-      }
+    it('invalid pubkey, digest, or signature should fail', async function () {
+      const wrongPubkeyInputs = {...inputs}
+      const wrongDigestInputs = {...inputs}
+      const wrongSigInputs = {...inputs}
 
-      await expect(makeProof(invalidInputs)).to.be.rejected;
-    })
+      wrongPubkeyInputs.pubkey[0] = (BigInt(wrongPubkeyInputs.pubkey[0]) + BigInt(1)).toString()
+      wrongDigestInputs.eContentSha[0] = (BigInt(wrongDigestInputs.eContentSha[0]) + BigInt(1)).toString()
+      wrongSigInputs.signature[0] = (BigInt(wrongSigInputs.signature[0]) + BigInt(1)).toString()
 
-    it('should fail to prove with invalid eContentBytes', async function () {
-      const invalidInputs = {
-        ...inputs,
-        eContentBytes: inputs.eContentBytes.map((byte: string) => String((parseInt(byte, 10) + 1) % 256)),
-      }
+      await expect(makeProof(wrongPubkeyInputs)).to.be.rejected;
+      await expect(makeProof(wrongDigestInputs)).to.be.rejected;
+      await expect(makeProof(wrongSigInputs)).to.be.rejected;
+      
+    });
 
-      await expect(makeProof(invalidInputs)).to.be.rejected;
-    })
+    // it('should fail to prove with invalid mrz', async function () {
+    //   const invalidInputs = {
+    //     ...inputs,
+    //     mrz: inputs.mrz.map((byte: string) => String((parseInt(byte, 10) + 1) % 256)),
+    //   }
+
+    //   await expect(makeProof(invalidInputs)).to.be.rejected;
+    // })
+
+    // it('should fail to prove with invalid eContentBytes', async function () {
+    //   const invalidInputs = {
+    //     ...inputs,
+    //     eContentBytes: inputs.eContentBytes.map((byte: string) => String((parseInt(byte, 10) + 1) % 256)),
+    //   }
+
+    //   await expect(makeProof(invalidInputs)).to.be.rejected;
+    // })
     
-    it('should fail to prove with invalid signature', async function () {
-      const invalidInputs = {
-        ...inputs,
-        signature: inputs.signature.map((byte: string) => String((parseInt(byte, 10) + 1) % 256)),
-      }
+    // it('should fail to prove with invalid signature', async function () {
+    //   const invalidInputs = {
+    //     ...inputs,
+    //     signature: inputs.signature.map((byte: string) => String((parseInt(byte, 10) + 1) % 256)),
+    //   }
 
-      await expect(makeProof(invalidInputs)).to.be.rejected;
-    })
+    //   await expect(makeProof(invalidInputs)).to.be.rejected;
+    // })
   
   // TODO: figure out how to do this test with wasm-vole-zk-adapter
     // it("shouldn't allow address maleability", async function () {

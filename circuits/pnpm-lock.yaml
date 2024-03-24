@@ -1,5 +1,9 @@
 lockfileVersion: '6.0'
 
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
 dependencies:
   '@types/chai-as-promised':
     specifier: ^7.1.6
@@ -40,9 +44,9 @@ dependencies:
   typescript:
     specifier: ^5.2.2
     version: 5.4.3
-  wasm-vole-zk-adapter:
-    specifier: 0.1.6
-    version: 0.1.6
+  wasm-vole-zk-adapter-nodejs:
+    specifier: 0.1.0
+    version: 0.1.0
 
 devDependencies:
   '@types/chai':
@@ -1411,8 +1415,8 @@ packages:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
     dev: false
 
-  /wasm-vole-zk-adapter@0.1.6:
-    resolution: {integrity: sha512-qgvwPuA6GE9LKu+DkLjp4W+d+zz/ffQEmkG43ZD5hzkRfvFbUQsY12/qLkzXSuPxWM5hpp+yDLlQqq4c9FjmpQ==}
+  /wasm-vole-zk-adapter-nodejs@0.1.0:
+    resolution: {integrity: sha512-AE19ATHN4M7+6lNUitn0atf24z66KIhZFZGpp1dMzr8z0ZJrYyJ5jwfBqvuc2n3vWJX6UneghQMh7gPBB48QjA==}
     dev: false
 
   /wasmbuilder@0.0.16:
