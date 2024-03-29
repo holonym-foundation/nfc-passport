@@ -8,11 +8,14 @@ import { getPassportData } from '../../common/src/utils/passportData'
 import { attributeToPosition } from '../../common/src/constants/constants'
 import * as fs from 'fs';
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { prove, verify } from 'wasm-vole-zk-adapter-nodejs'
+// import { prove, verify } from 'wasm-vole-zk-adapter-nodejs'
+import { prove, verify } from 'wasm-vole-zk-adapter'
 
 import dotenv from "dotenv"
 import { ISSUER_TREE_DEPTH, generateModulusHashes, loadIsssuerTree, hashPubkey, ISSUER_MERKLE_ROOT } from '../scripts/issuerPubkeyUtils'
 dotenv.config()
+chai.use(chaiAsPromised)
+
 
 // coneverts buffer to string of 0s and 1s
 // main line from https://stackoverflow.com/a/66415563
@@ -21,10 +24,18 @@ function buf2bin (buffer) {
   return Array.from(binString)
 }
 
-chai.use(chaiAsPromised)
+// JSON.stringify doesn't handle BigInts, so we need to convert them to strings
+function toJSON(obj: any) {
+  return JSON.stringify(obj, (key, value) =>
+    typeof value === 'bigint'
+        ? value.toString()
+        : value // return everything else unchanged
+  );
+}
 
 // urlCallbackData is the url-encoded data after the # in the callback url
-async function makeProofInputs(urlCallbackData: string) {
+// recipient is the ETH address of the recipient of the credential
+async function makeProofInputs(urlCallbackData: string, recipient: string) {
   const [digest, sig, pubkey] = urlCallbackData.replaceAll('%2B','+').replaceAll('%2F','/').replaceAll('%3D','=').split(',').map(x => Buffer.from(x, 'base64'));
   const tree = await loadIsssuerTree();
   const issuer = await hashPubkey('0x'+pubkey.toString('hex'));
@@ -45,10 +56,12 @@ async function makeProofInputs(urlCallbackData: string) {
       BigInt(64),
       BigInt(32)
     ),
-    eContentSha: buf2bin(digest)
+    eContentSha: buf2bin(digest),
+    recipient
   }
 }
 async function makeProof(inputs) {
+  fs.writeFileSync(`./proof_of_passport.inputs.json`, toJSON(inputs));
   const r1cs = fs.readFileSync(`./proof_of_passport.r1cs`);
   const wasm = fs.readFileSync(`./proof_of_passport_js/proof_of_passport.wasm`);
   const wc = await WitnessCalculatorBuilder(wasm);
@@ -69,12 +82,26 @@ describe('Circuit tests', function () {
   let inputs: any;
 
   this.beforeAll(async () => {
-    inputs = await makeProofInputs(process.env.PASSPORT_DATA_FROM_CALLBACK_URL)    
+    inputs = await makeProofInputs(process.env.PASSPORT_DATA_FROM_CALLBACK_URL, "0x01234567890abcdef01234567890abcdef012345");    
   })
   
   describe('Proof', function() {
+    it('test with local mock server', async function () {
+      const proof = await makeProof(inputs);
+      const res = await fetch("https://verifier.holonym.io/verify/0x0a/EPassportInCountryMerkleTree", {
+      // const res = await fetch("http://localhost:3000/verify/0x0a/EPassportInCountryMerkleTree", {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: proof
+      });
+
+      console.log('res.text', await res.text());
+      expect((await res.text()).startsWith(`{"values":{"circuit_id":"`)).to.be.true;
+    });
+
     it('should prove and verify with valid inputs', async function () {
       const proof = await makeProof(inputs);
+      fs.writeFileSync(`./proof_of_passport.proof`, proof);
       const r1cs = fs.readFileSync(`./proof_of_passport.r1cs`);
       const result = JSON.parse(await verify(r1cs, proof));
       console.log("result", result)
@@ -100,6 +127,8 @@ describe('Circuit tests', function () {
       await expect(makeProof(wrongSigInputs)).to.be.rejected;
       
     });
+
+    
 
     // it('should fail to prove with invalid mrz', async function () {
     //   const invalidInputs = {

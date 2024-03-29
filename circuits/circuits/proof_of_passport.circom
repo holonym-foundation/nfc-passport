@@ -9,13 +9,16 @@ include "./merkle-proof.circom";
 // This verifies a passport has a particular nullifier and its issuer is part of a Merkle root of allowed issuers
 template ProofOfPassport(n, k, MAX_DEPTH) {
     signal input depth, indices[MAX_DEPTH], siblings[MAX_DEPTH]; // binary merkle tree proof
-    // signal input mrz[93]; // formatted mrz (5 + 88) chars
-    // signal input dataHashes[297];
-    // signal input eContentBytes[104];
     signal input eContentSha[256];
     signal input pubkey[k];
     signal input signature[k];
+    // User address to reveal
+    signal input recipient;
 
+
+    // signal input mrz[93]; // formatted mrz (5 + 88) chars
+    // signal input dataHashes[297];
+    // signal input eContentBytes[104];
     // signal input reveal_bitmap[88];
     // signal input address;
 
@@ -55,12 +58,14 @@ template ProofOfPassport(n, k, MAX_DEPTH) {
         pubkey_hash.inputs[i] <== pubkey_packed[i];
     }
     pubkey_digest <== pubkey_hash.out;
-
+    
     // Prove set membership of issuer public key
     signal output root <== BinaryMerkleRoot(MAX_DEPTH)(pubkey_digest, depth, indices, siblings);
     
+    // Constrain the recipient
+    signal recipientSquared <== recipient * recipient;
 }
 
-component main = ProofOfPassport(64, 32, 15);
+component main { public [recipient] } = ProofOfPassport(64, 32, 15);
 
 

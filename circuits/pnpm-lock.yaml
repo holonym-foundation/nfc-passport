@@ -44,9 +44,9 @@ dependencies:
   typescript:
     specifier: ^5.2.2
     version: 5.4.3
-  wasm-vole-zk-adapter-nodejs:
-    specifier: 0.1.0
-    version: 0.1.0
+  wasm-vole-zk-adapter:
+    specifier: file:../../vole_zk/wasm-vole-zk-adapter/node-pkg
+    version: file:../../vole_zk/wasm-vole-zk-adapter/node-pkg
 
 devDependencies:
   '@types/chai':
@@ -1415,10 +1415,6 @@ packages:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
     dev: false
 
-  /wasm-vole-zk-adapter-nodejs@0.1.0:
-    resolution: {integrity: sha512-AE19ATHN4M7+6lNUitn0atf24z66KIhZFZGpp1dMzr8z0ZJrYyJ5jwfBqvuc2n3vWJX6UneghQMh7gPBB48QjA==}
-    dev: false
-
   /wasmbuilder@0.0.16:
     resolution: {integrity: sha512-Qx3lEFqaVvp1cEYW7Bfi+ebRJrOiwz2Ieu7ZG2l7YyeSJIok/reEQCQCuicj/Y32ITIJuGIM9xZQppGx5LrQdA==}
     dev: false
@@ -1514,3 +1510,9 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
     dev: true
+
+  file:../../vole_zk/wasm-vole-zk-adapter/node-pkg:
+    resolution: {directory: ../../vole_zk/wasm-vole-zk-adapter/node-pkg, type: directory}
+    name: wasm-vole-zk-adapter-nodejs
+    version: 0.1.0
+    dev: false

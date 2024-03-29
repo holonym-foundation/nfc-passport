@@ -1,3 +1,5 @@
 *.r1cs
+*.inputs.json
+*.wtns
 *_js
 
