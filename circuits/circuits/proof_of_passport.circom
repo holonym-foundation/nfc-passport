@@ -4,6 +4,7 @@ include "../node_modules/circomlib/circuits/poseidon.circom";
 include "./helpers/extract.circom";
 include "./passport_verifier.circom";
 include "./merkle-proof.circom";
+include "./helpers/utils.circom";
 
 
 // This verifies a passport has a particular nullifier and its issuer is part of a Merkle root of allowed issuers
@@ -16,6 +17,18 @@ template ProofOfPassport(n, k, MAX_DEPTH) {
     signal input recipient;
 
 
+    for (var i=0; i<256; i++){
+        eContentSha[i] * (eContentSha[i] - 1) === 0;
+    }
+
+    component range_checks1[k];
+    component range_checks2[k];
+    for (var i=0; i<k; i++){
+        range_checks1[i] = Num2Bits(64);
+        range_checks2[i] = Num2Bits(64);
+        range_checks1[i].in <== pubkey[i];
+        range_checks2[i].in <== signature[i];
+    }
     // signal input mrz[93]; // formatted mrz (5 + 88) chars
     // signal input dataHashes[297];
     // signal input eContentBytes[104];
