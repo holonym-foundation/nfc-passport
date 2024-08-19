@@ -60,7 +60,7 @@ template ProofOfPassport(n, k, MAX_DEPTH) {
         if (i < 10) {
             pubkey_packed[i] <== pubkey[3*i] * 64 * 64 + pubkey[3*i + 1] * 64 + pubkey[3*i + 2];
         } else {
-            pubkey_packed[i] <== pubkey[3*i] * 64 * 64;
+            pubkey_packed[i] <== pubkey[3*i] * 64 * 64 + pubkey[3*i + 1];
         }
     }
     
