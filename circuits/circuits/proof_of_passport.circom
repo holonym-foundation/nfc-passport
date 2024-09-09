@@ -7,9 +7,8 @@ include "./passport_verifier.circom";
 include "./merkle-proof.circom";
 include "./helpers/utils.circom";
 include "./helpers/isValid.circom";
-
-// include "@zk-email/circuits/utils/array.circom";
-include "../node_modules/@zk-email/circuits/utils/array.circom";
+include "./helpers/array.circom";
+include "./helpers/sha.circom";
 
 
 
@@ -19,7 +18,6 @@ template ProofOfPassport(n, k, MAX_DEPTH, max_datahashes_bytes) {
     // signal input eContentSha[256];
     signal input pubkey[k];
     signal input signature[k];
-
 
     signal input dg1_hash_offset;
     signal input dataHashes[max_datahashes_bytes];
@@ -67,7 +65,7 @@ template ProofOfPassport(n, k, MAX_DEPTH, max_datahashes_bytes) {
     }
 
     // hash dataHashes dynamically
-    signal dataHashesSha[256] <== Sha256Bytes(max_datahashes_bytes)(dataHashes, datahashes_padded_length);
+    signal dataHashesSha[256] <== Sha256Bytes2(max_datahashes_bytes)(dataHashes, datahashes_padded_length);
 
     // get output of dataHashes sha256 into bytes to check against eContent
     component dataHashesSha_bytes[hashLen];
@@ -80,28 +78,11 @@ template ProofOfPassport(n, k, MAX_DEPTH, max_datahashes_bytes) {
 
     // assert dataHashesSha is in eContentBytes in range bytes 72 to 104
     for(var i = 0; i < hashLen; i++) {
-        eContentBytes[eContentBytesLength - hashLen + i] === dataHashesSha_bytes[i].out;
+        eContent[eContentBytesLength - hashLen + i] === dataHashesSha_bytes[i].out;
     }
 
     // hash eContentBytes
-    signal eContentSha[256] <== Sha256BytesStatic(104)(eContentBytes);
-
-    // get output of eContentBytes sha256 into k chunks of n bits each
-    var msg_len = (256 + n) \ n;
-
-    //eContentHash: list of length 256/n +1 of components of n bits 
-    component eContentHash[msg_len];
-    for (var i = 0; i < msg_len; i++) {
-        eContentHash[i] = Bits2Num(n);
-    }
-
-    for (var i = 0; i < 256; i++) {
-        eContentHash[i \ n].in[i % n] <== eContentSha[255 - i];
-    }
-
-    for (var i = 256; i < n * msg_len; i++) {
-        eContentHash[i \ n].in[i % n] <== 0;
-    }
+    signal eContentSha[256] <== Sha256BytesStatic(104)(eContent);
 
 
     // No need to verify digest to be binary format anymore
@@ -117,26 +98,12 @@ template ProofOfPassport(n, k, MAX_DEPTH, max_datahashes_bytes) {
         range_checks1[i].in <== pubkey[i];
         range_checks2[i].in <== signature[i];
     }
-    // signal input mrz[93]; // formatted mrz (5 + 88) chars
-    // signal input dataHashes[297];
-    // signal input eContentBytes[104];
-    // signal input reveal_bitmap[88];
-    // signal input address;
 
     // Verify passport
     component PV = PassportVerifier(n, k);
-    // PV.mrz <== mrz;
-    // PV.dataHashes <== dataHashes;
-    PV.eContentSha <== eContentHash;
+    PV.eContentSha <== eContentSha;
     PV.pubkey <== pubkey;
     PV.signature <== signature;
-
-    // // reveal reveal_bitmap bits of MRZ
-    // signal reveal[88];
-    // for (var i = 0; i < 88; i++) {
-    //     reveal[i] <== mrz[5+i] * reveal_bitmap[i];
-    // }
-    // signal output reveal_packed[3] <== PackBytes(88, 3, 31)(reveal);
 
 
     // make nullifier public;

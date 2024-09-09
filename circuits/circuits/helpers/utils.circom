@@ -3,7 +3,7 @@ pragma circom 2.1.5;
 include "../../node_modules/circomlib/circuits/bitify.circom";
 include "../../node_modules/circomlib/circuits/comparators.circom";
 include "../../node_modules/circomlib/circuits/mimcsponge.circom";
-include "../../node_modules/circomlib/circuits/sha256/sha2556.circom";
+// include "../../node_modules/circomlib/circuits/sha256/sha2556.circom";
 include "./fp.circom";
 
 // returns ceil(log2(a+1))
